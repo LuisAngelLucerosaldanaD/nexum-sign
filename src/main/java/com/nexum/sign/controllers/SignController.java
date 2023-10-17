@@ -27,12 +27,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.*;
 import java.security.cert.Certificate;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/nexum")
 @AllArgsConstructor
 public class SignController {
-
     @Operation(summary = "Firma electrónica del PDF generado por Nexum",
             description = "Método que permite firmar eletrónicamente el archivo PDF generado por el sistema Nexum")
     @SecurityRequirement(name = "bearer")
@@ -70,7 +70,7 @@ public class SignController {
             PrivateKey privateKey = (PrivateKey) keystore.getKey(certAlias, keystorePassword.toCharArray());
 
             sign(originalPdfFilePath, signedPdfFilePath, chain, privateKey, DigestAlgorithms.SHA256,
-                    PdfSigner.CryptoStandard.CMS, req.location, req.ip_list, req.document_id);
+                    PdfSigner.CryptoStandard.CMS, req.location, req.document_id);
 
             res.error = false;
             res.data = "acá ira el base 64";
@@ -109,18 +109,43 @@ public class SignController {
         String originalPdfFilePath = "./temp-validate.pdf";
 
         try {
-            FileUtil.base64ToStore(req.pdf, originalPdfFilePath);
+            PdfReader reader = new PdfReader(originalPdfFilePath);
+            PdfDocument pdfDoc = new PdfDocument(reader);
+
+            SignatureUtil signUtil = new SignatureUtil(pdfDoc);
+            List<String> names = signUtil.getSignatureNames();
+
+            if (names.isEmpty()) {
+                res.msg = "No se encontraron firmas en el documento pdf";
+                res.code = 1;
+                res.type = "error";
+                return new ResponseEntity<>(res, new HttpHeaders(), HttpStatus.ACCEPTED);
+            }
+
+            for (String name : names) {
+                var signature = signUtil.readSignatureData(name);
+                if (!signature.verifySignatureIntegrityAndAuthenticity()) {
+                    res.msg = "Las firmas del documento estan corruptas o no son validas";
+                    res.code = 1;
+                    res.type = "error";
+                    return new ResponseEntity<>(res, new HttpHeaders(), HttpStatus.ACCEPTED);
+                }
+            }
+
+            reader.close();
 
             return new ResponseEntity<>(res, new HttpHeaders(), HttpStatus.ACCEPTED);
         } catch (Exception e) {
-
+            res.msg = e.getMessage();
+            res.code = e.hashCode();
+            res.type = "error";
             return new ResponseEntity<>(res, new HttpHeaders(), HttpStatus.ACCEPTED);
         }
     }
 
     public void sign(String src, String dest, Certificate[] chain,
                      PrivateKey pk, String digestAlgorithm,
-                     PdfSigner.CryptoStandard subFilter, String location, String ipList, String documentID)
+                     PdfSigner.CryptoStandard subFilter, String location, String documentID)
             throws GeneralSecurityException, IOException {
 
         PdfReader reader = new PdfReader(src);
