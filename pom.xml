@@ -30,20 +30,22 @@
 		<dependency>
 			<groupId>com.itextpdf</groupId>
 			<artifactId>kernel</artifactId>
-			<version>7.1.18</version>
+			<version>8.0.1</version>
 		</dependency>
 
 		<dependency>
 			<groupId>com.itextpdf</groupId>
 			<artifactId>sign</artifactId>
-			<version>7.1.12</version>
+			<version>8.0.1</version>
 		</dependency>
 
+		<!-- https://mvnrepository.com/artifact/com.itextpdf/bouncy-castle-adapter -->
 		<dependency>
 			<groupId>com.itextpdf</groupId>
-			<artifactId>itext-xtra</artifactId>
-			<version>5.5.13.2</version>
+			<artifactId>bouncy-castle-adapter</artifactId>
+			<version>8.0.1</version>
 		</dependency>
+
 
 		<dependency>
 			<groupId>org.projectlombok</groupId>

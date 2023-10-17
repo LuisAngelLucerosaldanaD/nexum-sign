@@ -1,6 +1,8 @@
 package com.nexum.sign.controllers;
 
-import com.itextpdf.kernel.pdf.*;
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfReader;
+import com.itextpdf.kernel.pdf.StampingProperties;
 import com.itextpdf.signatures.*;
 import com.nexum.sign.models.RequestSign;
 import com.nexum.sign.models.RequestValidateSign;
@@ -12,6 +14,7 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
+import com.itextpdf.signatures.BouncyCastleDigest;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -25,7 +28,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.security.*;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
+import java.security.PrivateKey;
+import java.security.Security;
 import java.security.cert.Certificate;
 import java.util.List;
 
@@ -54,7 +60,7 @@ public class SignController {
         try {
 
             String originalPdfFilePath = "./temp_signed.pdf";
-            String signedPdfFilePath = "./temp_signeded.pdf";
+            String signedPdfFilePath = "./test2.pdf";
             String keystoreFilePath = "./test.p12";
             String keystorePassword = "comfandi_datacredito_dev";
             String certAlias = "datacredito_comfandi_dev";
@@ -106,11 +112,20 @@ public class SignController {
             return new ResponseEntity<>(res, new HttpHeaders(), HttpStatus.BAD_REQUEST);
         }
 
-        String originalPdfFilePath = "./temp-validate.pdf";
+        String originalPdfFilePath = "./test2.pdf";
 
         try {
-            PdfReader reader = new PdfReader(originalPdfFilePath);
-            PdfDocument pdfDoc = new PdfDocument(reader);
+            BouncyCastleProvider provider = new BouncyCastleProvider();
+            Security.addProvider(provider);
+
+            String keystoreFilePath = "./test.p12";
+            String keystorePassword = "comfandi_datacredito_dev";
+            KeyStore keystore = KeyStore.getInstance("PKCS12");
+            try (FileInputStream fis = new FileInputStream(keystoreFilePath)) {
+                keystore.load(fis, keystorePassword.toCharArray());
+            }
+
+            PdfDocument pdfDoc = new PdfDocument(new PdfReader(originalPdfFilePath));
 
             SignatureUtil signUtil = new SignatureUtil(pdfDoc);
             List<String> names = signUtil.getSignatureNames();
@@ -123,7 +138,7 @@ public class SignController {
             }
 
             for (String name : names) {
-                var signature = signUtil.readSignatureData(name);
+                PdfPKCS7 signature = signUtil.readSignatureData(name);
                 if (!signature.verifySignatureIntegrityAndAuthenticity()) {
                     res.msg = "Las firmas del documento estan corruptas o no son validas";
                     res.code = 1;
@@ -132,8 +147,12 @@ public class SignController {
                 }
             }
 
-            reader.close();
+            pdfDoc.close();
 
+            res.error = false;
+            res.msg = "Todas las firmas del documento son validas";
+            res.code = 29;
+            res.type = "success";
             return new ResponseEntity<>(res, new HttpHeaders(), HttpStatus.ACCEPTED);
         } catch (Exception e) {
             res.msg = e.getMessage();
