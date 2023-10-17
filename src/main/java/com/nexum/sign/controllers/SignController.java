@@ -59,8 +59,8 @@ public class SignController {
 
         try {
 
-            String originalPdfFilePath = "./temp_signed.pdf";
-            String signedPdfFilePath = "./test2.pdf";
+            String originalPdfFilePath = "./temp_pdf_base.pdf";
+            String signedPdfFilePath = "./temp_pdf_signed.pdf";
             String keystoreFilePath = "./test.p12";
             String keystorePassword = "comfandi_datacredito_dev";
             String certAlias = "datacredito_comfandi_dev";
@@ -79,7 +79,6 @@ public class SignController {
                     PdfSigner.CryptoStandard.CMS, req.location, req.document_id);
 
             res.error = false;
-            res.data = "acá ira el base 64";
             res.code = 29;
             res.type = "success";
             res.msg = "procesado correctamente";
@@ -105,16 +104,19 @@ public class SignController {
             RequestValidateSign req
     ) {
         Response res = new Response(true);
-        if (req == null || req.pdf == null) {
+        if (req == null || req.pdf == null || req.pdf.isEmpty()) {
             res.msg = "Cuerpo de la petición no valida";
             res.code = 1;
             res.type = "error";
             return new ResponseEntity<>(res, new HttpHeaders(), HttpStatus.BAD_REQUEST);
         }
 
-        String originalPdfFilePath = "./test2.pdf";
+        String originalPdfFilePath = "./temp_pdf_signed.pdf";
 
         try {
+
+            FileUtil.base64ToStore(req.pdf, originalPdfFilePath);
+
             BouncyCastleProvider provider = new BouncyCastleProvider();
             Security.addProvider(provider);
 
@@ -131,6 +133,7 @@ public class SignController {
             List<String> names = signUtil.getSignatureNames();
 
             if (names.isEmpty()) {
+                FileUtil.deleteFile(originalPdfFilePath);
                 res.msg = "No se encontraron firmas en el documento pdf";
                 res.code = 1;
                 res.type = "error";
@@ -140,6 +143,7 @@ public class SignController {
             for (String name : names) {
                 PdfPKCS7 signature = signUtil.readSignatureData(name);
                 if (!signature.verifySignatureIntegrityAndAuthenticity()) {
+                    FileUtil.deleteFile(originalPdfFilePath);
                     res.msg = "Las firmas del documento estan corruptas o no son validas";
                     res.code = 1;
                     res.type = "error";
@@ -148,7 +152,7 @@ public class SignController {
             }
 
             pdfDoc.close();
-
+            FileUtil.deleteFile(originalPdfFilePath);
             res.error = false;
             res.msg = "Todas las firmas del documento son validas";
             res.code = 29;
