@@ -4,10 +4,7 @@ import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfReader;
 import com.itextpdf.kernel.pdf.StampingProperties;
 import com.itextpdf.signatures.*;
-import com.nexum.sign.models.RequestSign;
-import com.nexum.sign.models.RequestValidateSign;
 import com.nexum.sign.models.Response;
-import com.nexum.sign.utils.FileUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -20,19 +17,18 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.Security;
 import java.security.cert.Certificate;
+import java.util.Base64;
 import java.util.List;
 
 @RestController
@@ -46,11 +42,15 @@ public class SignController {
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE, path = "/sign")
     @Parameter(in = ParameterIn.HEADER, name = "Authorization", description = "Token de autorización",
             required = true, example = "Bearer <token>")
-    public ResponseEntity<Response> SignPdf(@RequestBody RequestSign req) {
+    public ResponseEntity<Response> SignPdf(
+            @RequestPart("pdf") MultipartFile pdfFile,
+            @RequestParam("location") String location,
+            @RequestParam("document_id") String documentId
+    ) {
 
         Response res = new Response(true);
 
-        if (req == null || !req.validate()) {
+        if (location == null || location.isEmpty() || documentId == null || documentId.isEmpty()) {
             res.msg = "Cuerpo de la petición no valida";
             res.code = 1;
             res.type = "error";
@@ -59,13 +59,9 @@ public class SignController {
 
         try {
 
-            String originalPdfFilePath = "./temp_pdf_base.pdf";
-            String signedPdfFilePath = "./temp_pdf_signed.pdf";
-            String keystoreFilePath = "./test.p12";
-            String keystorePassword = "comfandi_datacredito_dev";
-            String certAlias = "datacredito_comfandi_dev";
-
-            FileUtil.base64ToStore(req.pdf, originalPdfFilePath);
+            String keystoreFilePath = "./nexum.p12";
+            String keystorePassword = "nexum123";
+            String certAlias = "nexum";
 
             KeyStore keystore = KeyStore.getInstance("PKCS12");
             try (FileInputStream fis = new FileInputStream(keystoreFilePath)) {
@@ -75,17 +71,15 @@ public class SignController {
             Certificate[] chain = keystore.getCertificateChain(certAlias);
             PrivateKey privateKey = (PrivateKey) keystore.getKey(certAlias, keystorePassword.toCharArray());
 
-            sign(originalPdfFilePath, signedPdfFilePath, chain, privateKey, DigestAlgorithms.SHA256,
-                    PdfSigner.CryptoStandard.CMS, req.location, req.document_id);
+            String pdfSigned = sign(pdfFile, chain, privateKey, DigestAlgorithms.SHA256,
+                    PdfSigner.CryptoStandard.CMS, location, documentId);
 
             res.error = false;
             res.code = 29;
             res.type = "success";
             res.msg = "procesado correctamente";
-            res.data = FileUtil.getBase64ToPath(signedPdfFilePath);
+            res.data = pdfSigned;
 
-            FileUtil.deleteFile(originalPdfFilePath);
-            FileUtil.deleteFile(signedPdfFilePath);
             return new ResponseEntity<>(res, new HttpHeaders(), HttpStatus.ACCEPTED);
         } catch (Exception e) {
             res.msg = e.getMessage();
@@ -98,42 +92,31 @@ public class SignController {
     @Operation(summary = "Valida la firma electrónica del PDF generado por Nexum",
             description = "Método que permite validar la firmar eletrónicamente del archivo PDF generado por el sistema Nexum")
     @Tag(name = "Sign")
-    @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE, path = "/validate-sign")
+    @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE, path = "/validate-sign", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Response> ValidateSignPdf(
-            @RequestBody
-            RequestValidateSign req
+            @RequestParam("pdf") MultipartFile pdf
     ) {
         Response res = new Response(true);
-        if (req == null || req.pdf == null || req.pdf.isEmpty()) {
-            res.msg = "Cuerpo de la petición no valida";
-            res.code = 1;
-            res.type = "error";
-            return new ResponseEntity<>(res, new HttpHeaders(), HttpStatus.BAD_REQUEST);
-        }
-
-        String originalPdfFilePath = "./temp_pdf_signed.pdf";
 
         try {
-
-            FileUtil.base64ToStore(req.pdf, originalPdfFilePath);
 
             BouncyCastleProvider provider = new BouncyCastleProvider();
             Security.addProvider(provider);
 
-            String keystoreFilePath = "./test.p12";
-            String keystorePassword = "comfandi_datacredito_dev";
+            String keystoreFilePath = "./nexum.p12";
+            String keystorePassword = "nexum123";
             KeyStore keystore = KeyStore.getInstance("PKCS12");
             try (FileInputStream fis = new FileInputStream(keystoreFilePath)) {
                 keystore.load(fis, keystorePassword.toCharArray());
             }
 
-            PdfDocument pdfDoc = new PdfDocument(new PdfReader(originalPdfFilePath));
+            PdfReader pdfReader = new PdfReader(pdf.getInputStream());
+            PdfDocument pdfDoc = new PdfDocument(pdfReader);
 
             SignatureUtil signUtil = new SignatureUtil(pdfDoc);
             List<String> names = signUtil.getSignatureNames();
 
             if (names.isEmpty()) {
-                FileUtil.deleteFile(originalPdfFilePath);
                 res.msg = "No se encontraron firmas en el documento pdf";
                 res.code = 1;
                 res.type = "error";
@@ -143,7 +126,6 @@ public class SignController {
             for (String name : names) {
                 PdfPKCS7 signature = signUtil.readSignatureData(name);
                 if (!signature.verifySignatureIntegrityAndAuthenticity()) {
-                    FileUtil.deleteFile(originalPdfFilePath);
                     res.msg = "Las firmas del documento estan corruptas o no son validas";
                     res.code = 1;
                     res.type = "error";
@@ -151,8 +133,8 @@ public class SignController {
                 }
             }
 
+            pdfReader.close();
             pdfDoc.close();
-            FileUtil.deleteFile(originalPdfFilePath);
             res.error = false;
             res.msg = "Todas las firmas del documento son validas";
             res.code = 29;
@@ -166,14 +148,14 @@ public class SignController {
         }
     }
 
-    public void sign(String src, String dest, Certificate[] chain,
-                     PrivateKey pk, String digestAlgorithm,
-                     PdfSigner.CryptoStandard subFilter, String location, String documentID)
+    public String sign(MultipartFile pdf, Certificate[] chain,
+                       PrivateKey pk, String digestAlgorithm,
+                       PdfSigner.CryptoStandard subFilter, String location, String documentID)
             throws GeneralSecurityException, IOException {
 
-        PdfReader reader = new PdfReader(src);
-        FileOutputStream file = new FileOutputStream(dest);
-        PdfSigner signer = new PdfSigner(reader, file, new StampingProperties());
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        PdfReader reader = new PdfReader(pdf.getInputStream());
+        PdfSigner signer = new PdfSigner(reader, output, new StampingProperties());
 
         PdfSignatureAppearance appearance = signer.getSignatureAppearance();
         appearance.setReason("Firma electronica expedida por www.nexum.com");
@@ -191,8 +173,10 @@ public class SignController {
         IExternalDigest digest = new BouncyCastleDigest();
 
         signer.signDetached(digest, pks, chain, null, null, null, 0, subFilter);
-        file.close();
+        String result = Base64.getEncoder().encodeToString(output.toByteArray());
+        output.close();
         reader.close();
+        return result;
     }
 
 }
