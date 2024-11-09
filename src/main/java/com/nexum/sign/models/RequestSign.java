@@ -1,13 +1,21 @@
 package com.nexum.sign.models;
 
+import com.nexum.sign.models.annexe.Annexe;
+import com.nexum.sign.models.annexe.FilePdf;
+import com.nexum.sign.models.signer.Signer;
+import lombok.AllArgsConstructor;
+
+import java.util.List;
+
+@AllArgsConstructor
 public class RequestSign {
-    public String pdf;
-    public String location;
-    public String document_id;
+    public String original;
+    public String description;
+    public String encode;
+    public List<Annexe> annexes;
+    public List<Signer> signers;
 
-    public boolean validate() {
-        return pdf != null && !pdf.isEmpty() && location != null && !location.isEmpty() && document_id != null
-                && !document_id.isEmpty();
+    public boolean isValid() {
+        return original == null || description == null || encode == null || encode.isEmpty() || annexes == null || signers == null || signers.isEmpty();
     }
-
 }

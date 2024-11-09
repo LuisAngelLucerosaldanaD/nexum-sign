@@ -4,7 +4,11 @@ import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfReader;
 import com.itextpdf.kernel.pdf.StampingProperties;
 import com.itextpdf.signatures.*;
+import com.nexum.sign.infraestructure.configuration.KeystoreConfig;
+import com.nexum.sign.models.RequestSign;
 import com.nexum.sign.models.Response;
+import com.nexum.sign.utils.FileUtil;
+import com.nexum.sign.utils.SignUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -35,6 +39,8 @@ import java.util.List;
 @RequestMapping("/api/v1/nexum")
 @AllArgsConstructor
 public class SignController {
+    private final KeystoreConfig keystoreConfig;
+
     @Operation(summary = "Firma electrónica del PDF generado por Nexum",
             description = "Método que permite firmar eletrónicamente el archivo PDF generado por el sistema Nexum")
     @SecurityRequirement(name = "bearer")
@@ -43,14 +49,10 @@ public class SignController {
     @Parameter(in = ParameterIn.HEADER, name = "Authorization", description = "Token de autorización",
             required = true, example = "Bearer <token>")
     public ResponseEntity<Response> SignPdf(
-            @RequestPart("pdf") MultipartFile pdfFile,
-            @RequestParam("location") String location,
-            @RequestParam("document_id") String documentId
+            @RequestBody RequestSign req
     ) {
-
         Response res = new Response(true);
-
-        if (location == null || location.isEmpty() || documentId == null || documentId.isEmpty()) {
+        if (req.isValid()) {
             res.msg = "Cuerpo de la petición no valida";
             res.code = 1;
             res.type = "error";
@@ -59,9 +61,9 @@ public class SignController {
 
         try {
 
-            String keystoreFilePath = "./nexum.p12";
-            String keystorePassword = "nexum123";
-            String certAlias = "nexum";
+            String keystoreFilePath = keystoreConfig.getFilePath();
+            String keystorePassword = keystoreConfig.getPassword();
+            String certAlias = keystoreConfig.getAlias();
 
             KeyStore keystore = KeyStore.getInstance("PKCS12");
             try (FileInputStream fis = new FileInputStream(keystoreFilePath)) {
@@ -71,8 +73,10 @@ public class SignController {
             Certificate[] chain = keystore.getCertificateChain(certAlias);
             PrivateKey privateKey = (PrivateKey) keystore.getKey(certAlias, keystorePassword.toCharArray());
 
-            String pdfSigned = sign(pdfFile, chain, privateKey, DigestAlgorithms.SHA256,
-                    PdfSigner.CryptoStandard.CMS, location, documentId);
+            req.encode = FileUtil.attachAnnexe(req.encode, req.annexes);
+
+            String pdfSigned = SignUtil.Sign(req.encode, chain, privateKey, DigestAlgorithms.SHA256,
+                    PdfSigner.CryptoStandard.CMS, req.signers);
 
             res.error = false;
             res.code = 29;
@@ -146,37 +150,6 @@ public class SignController {
             res.type = "error";
             return new ResponseEntity<>(res, new HttpHeaders(), HttpStatus.ACCEPTED);
         }
-    }
-
-    public String sign(MultipartFile pdf, Certificate[] chain,
-                       PrivateKey pk, String digestAlgorithm,
-                       PdfSigner.CryptoStandard subFilter, String location, String documentID)
-            throws GeneralSecurityException, IOException {
-
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PdfReader reader = new PdfReader(pdf.getInputStream());
-        PdfSigner signer = new PdfSigner(reader, output, new StampingProperties());
-
-        PdfSignatureAppearance appearance = signer.getSignatureAppearance();
-        appearance.setReason("Firma electronica expedida por www.nexum.com");
-        appearance.setLocation(location);
-        appearance.setSignatureCreator("NexumSign");
-        appearance.setContact("souport@nexum.sign - 51923062749");
-        appearance.setReuseAppearance(false);
-
-        signer.setCertificationLevel(1);
-        signer.setFieldName("sig");
-
-        BouncyCastleProvider provider = new BouncyCastleProvider();
-        Security.addProvider(provider);
-        IExternalSignature pks = new PrivateKeySignature(pk, digestAlgorithm, BouncyCastleProvider.PROVIDER_NAME);
-        IExternalDigest digest = new BouncyCastleDigest();
-
-        signer.signDetached(digest, pks, chain, null, null, null, 0, subFilter);
-        String result = Base64.getEncoder().encodeToString(output.toByteArray());
-        output.close();
-        reader.close();
-        return result;
     }
 
 }
