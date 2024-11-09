@@ -1,7 +1,6 @@
 package com.nexum.sign.models;
 
 import com.nexum.sign.models.annexe.Annexe;
-import com.nexum.sign.models.annexe.FilePdf;
 import com.nexum.sign.models.signer.Signer;
 import lombok.AllArgsConstructor;
 

@@ -20,7 +20,7 @@ public class SignApplication {
 		return new OpenAPI()
 				.info(new Info().title("Nexum API Sign")
 						.description("API que permite firmar eletrónicamente los documentos generados por el sistema NEXUM")
-						.version("v0.0.1")
+						.version("v0.0.4")
 						.license(new License().name("Licencia").url("https://www.bjungle.net")))
 				.externalDocs(new ExternalDocumentation()
 						.description("Información adicional")

@@ -55,4 +55,14 @@ public class FileUtil {
         pdfDoc.close();
         return Base64.getEncoder().encodeToString(outputStream.toByteArray());
     }
+
+    public static String configureDocument(String base64Pdf) throws IOException {
+        byte[] pdfBytes = Base64.getDecoder().decode(base64Pdf);
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        PdfDocument pdfDoc = new PdfDocument(new PdfReader(new ByteArrayInputStream(pdfBytes)), new PdfWriter(outputStream));
+        pdfDoc.getDocumentInfo().setCreator("NexumSign");
+        pdfDoc.getDocumentInfo().setProducer("NexumSign");
+        pdfDoc.close();
+        return Base64.getEncoder().encodeToString(outputStream.toByteArray());
+    }
 }

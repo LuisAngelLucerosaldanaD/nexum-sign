@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+## certain settings
+*.p12
+*.jks

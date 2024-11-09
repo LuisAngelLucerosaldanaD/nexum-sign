@@ -13,7 +13,7 @@ public class ServerConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(authorizationInterceptor)
-                .addPathPatterns("/api/v1/nexum/**");
+        /*registry.addInterceptor(authorizationInterceptor)
+                .addPathPatterns("/api/v1/nexum/**");*/
     }
 }

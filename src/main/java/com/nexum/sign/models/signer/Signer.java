@@ -11,4 +11,6 @@ public class Signer {
     public String face_id;
     public ImageSign image_sign;
     public Position position;
+    public String reason;
+    public String location;
 }

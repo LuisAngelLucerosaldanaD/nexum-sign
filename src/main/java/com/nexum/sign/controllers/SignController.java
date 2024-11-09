@@ -2,7 +2,6 @@ package com.nexum.sign.controllers;
 
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfReader;
-import com.itextpdf.kernel.pdf.StampingProperties;
 import com.itextpdf.signatures.*;
 import com.nexum.sign.infraestructure.configuration.KeystoreConfig;
 import com.nexum.sign.models.RequestSign;
@@ -12,10 +11,10 @@ import com.nexum.sign.utils.SignUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
-import com.itextpdf.signatures.BouncyCastleDigest;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -24,15 +23,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
-import java.io.IOException;
-import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.Security;
 import java.security.cert.Certificate;
-import java.util.Base64;
 import java.util.List;
 
 @RestController
@@ -48,6 +43,11 @@ public class SignController {
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE, path = "/sign")
     @Parameter(in = ParameterIn.HEADER, name = "Authorization", description = "Token de autorización",
             required = true, example = "Bearer <token>")
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            description = "Request body que contiene la información necesaria para firmar el PDF",
+            required = true,
+            content = @Content(mediaType = "application/json")
+    )
     public ResponseEntity<Response> SignPdf(
             @RequestBody RequestSign req
     ) {
@@ -74,6 +74,8 @@ public class SignController {
             PrivateKey privateKey = (PrivateKey) keystore.getKey(certAlias, keystorePassword.toCharArray());
 
             req.encode = FileUtil.attachAnnexe(req.encode, req.annexes);
+
+            req.encode = FileUtil.configureDocument(req.encode);
 
             String pdfSigned = SignUtil.Sign(req.encode, chain, privateKey, DigestAlgorithms.SHA256,
                     PdfSigner.CryptoStandard.CMS, req.signers);
