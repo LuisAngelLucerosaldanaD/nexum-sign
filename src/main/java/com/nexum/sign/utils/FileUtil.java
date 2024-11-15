@@ -1,10 +1,15 @@
 package com.nexum.sign.utils;
 
+import com.itextpdf.kernel.font.PdfFontFactory;
 import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfPage;
 import com.itextpdf.kernel.pdf.PdfReader;
 import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
 import com.itextpdf.kernel.pdf.filespec.PdfFileSpec;
 import com.nexum.sign.models.annexe.Annexe;
+import com.nexum.sign.models.signer.AcrossField;
+import com.nexum.sign.models.signer.Signer;
 import org.springframework.util.DigestUtils;
 
 import java.io.*;
@@ -72,7 +77,38 @@ public class FileUtil {
 
     public static String getFileHash(String file) throws IOException, NoSuchAlgorithmException {
         byte[] fileBytes = Base64.getDecoder().decode(file);
-        byte[] hash = MessageDigest.getInstance("SHA-256").digest(fileBytes);
+        return getHash(fileBytes);
+    }
+
+    public static String getHash(byte[] file) throws NoSuchAlgorithmException {
+        byte[] hash = MessageDigest.getInstance("SHA-256").digest(file);
         return new BigInteger(1, hash).toString(16);
+    }
+
+    public static String SetAcrossFields(String pdf, List<Signer> signers) throws IOException {
+        byte[] pdfBytes = Base64.getDecoder().decode(pdf);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayInputStream inputStream = new ByteArrayInputStream(pdfBytes);
+
+        PdfDocument pdfDoc = new PdfDocument(new PdfReader(inputStream), new PdfWriter(output));
+
+        for (Signer signer : signers) {
+            for (AcrossField field : signer.across_fields) {
+                PdfPage page = pdfDoc.getPage(field.page);
+                PdfCanvas canvas = new PdfCanvas(page);
+                canvas.beginText()
+                        .setFontAndSize(PdfFontFactory.createFont(), 12)
+                        .moveText(field.x, field.y)
+                        .showText(field.text)
+                        .endText();
+            }
+        }
+        pdfDoc.close();
+
+        String result = Base64.getEncoder().encodeToString(output.toByteArray());
+        output.close();
+        inputStream.close();
+
+        return result;
     }
 }

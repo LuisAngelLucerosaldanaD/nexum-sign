@@ -28,31 +28,35 @@ public class SignUtil {
             throws GeneralSecurityException, IOException {
 
         byte[] pdfBytes = Base64.getDecoder().decode(pdf);
-        String hash = FileUtil.getFileHash(pdf);
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PdfReader reader = new PdfReader(new ByteArrayInputStream(pdfBytes));
-
         BouncyCastleProvider provider = new BouncyCastleProvider();
         Security.addProvider(provider);
-        IExternalDigest digest = new BouncyCastleDigest();
-        IExternalSignature pks = new PrivateKeySignature(pk, digestAlgorithm, BouncyCastleProvider.PROVIDER_NAME);
 
+        byte[] currentPdfBytes = pdfBytes;
         for (Signer signer : signers) {
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            IExternalDigest digest = new BouncyCastleDigest();
+            IExternalSignature pks = new PrivateKeySignature(pk, digestAlgorithm, BouncyCastleProvider.PROVIDER_NAME);
+
+            String hash = FileUtil.getHash(currentPdfBytes);
+            PdfReader reader = new PdfReader(new ByteArrayInputStream(currentPdfBytes));
             PdfSigner pdfSigner = GetPdfSigner(signer, reader, output, hash);
-            pdfSigner.setCertificationLevel(PdfSigner.CERTIFIED_NO_CHANGES_ALLOWED);
+            pdfSigner.setCertificationLevel(PdfSigner.NOT_CERTIFIED);
             pdfSigner.signDetached(digest, pks, chain, null, null, null, 0, subFilter);
+            currentPdfBytes = output.toByteArray();
+
+            output.close();
+            reader.close();
         }
 
-        String result = Base64.getEncoder().encodeToString(output.toByteArray());
-        output.close();
-        reader.close();
-        return result;
+        return Base64.getEncoder().encodeToString(currentPdfBytes);
     }
 
     private static PdfSigner GetPdfSigner(Signer signerInfo, PdfReader reader, ByteArrayOutputStream output, String hash) throws IOException {
-        PdfSigner signer = new PdfSigner(reader, output, new StampingProperties());
-        String contact = signerInfo.dbj_cedula + " - " + signerInfo.dbj_nombres + " " + signerInfo.dbj_apellidos;
+        StampingProperties properties = new StampingProperties();
+        properties.useAppendMode();
+        PdfSigner signer = new PdfSigner(reader, output, properties);
         String fullName = signerInfo.dbj_nombres + " " + signerInfo.dbj_apellidos;
+        String contact = signerInfo.dbj_cedula + " - " + fullName;
         Date date = new Date();
 
         signer.setReason(signerInfo.reason);
@@ -61,9 +65,8 @@ public class SignUtil {
         signer.setContact(contact);
         signer.setPageRect(new Rectangle(signerInfo.position.x, signerInfo.position.y, 300, 70));
 
-        String text = "Hash: \n" + hash + "\nFirmante: \n" + fullName + "\nNo. Documento: " + signerInfo.dbj_cedula
-                + "\nTIMESTAMP: " + date.getTime() + "\nRol: " + signerInfo.attribute_header
-                + "\nFace ID: " + signerInfo.face_id + "\nZone: " + signerInfo.location;
+        String text = String.format("Hash: %s\nFirmante: %s\nNo. Documento: %s\nTIMESTAMP: %d\nRol: %s\nFace ID: %s\nZone: %s", hash, fullName,
+                signerInfo.dbj_cedula, date.getTime(), signerInfo.attribute_header, signerInfo.face_id, signerInfo.location);
 
         SignatureFieldAppearance appearance = new SignatureFieldAppearance(signerInfo.dbj_cedula);
         appearance.setPageNumber(signerInfo.position.num_page);
@@ -71,18 +74,7 @@ public class SignUtil {
         ImageData image = ImageDataFactory.create(img);
         appearance.setContent(text, image);
 
-        /*ImageData back = ImageDataFactory.create("./fondo.png");
-        BackgroundSize size = new BackgroundSize();
-        size.setBackgroundSizeToValues(UnitValue.createPercentValue(50), UnitValue.createPercentValue(30));
-
-        appearance.setBackgroundImage(
-                new BackgroundImage.Builder()
-                        .setImage(new PdfImageXObject(back))
-                        .setBackgroundSize(size)
-                        .build());*/
-
         signer.setSignatureAppearance(appearance);
-        signer.setCertificationLevel(1);
         signer.setFieldName(signerInfo.dbj_cedula);
         return signer;
     }
