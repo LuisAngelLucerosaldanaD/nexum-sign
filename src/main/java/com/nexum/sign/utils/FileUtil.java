@@ -5,8 +5,12 @@ import com.itextpdf.kernel.pdf.PdfReader;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.kernel.pdf.filespec.PdfFileSpec;
 import com.nexum.sign.models.annexe.Annexe;
+import org.springframework.util.DigestUtils;
 
 import java.io.*;
+import java.math.BigInteger;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.List;
 
@@ -64,5 +68,11 @@ public class FileUtil {
         pdfDoc.getDocumentInfo().setProducer("NexumSign");
         pdfDoc.close();
         return Base64.getEncoder().encodeToString(outputStream.toByteArray());
+    }
+
+    public static String getFileHash(String file) throws IOException, NoSuchAlgorithmException {
+        byte[] fileBytes = Base64.getDecoder().decode(file);
+        byte[] hash = MessageDigest.getInstance("SHA-256").digest(fileBytes);
+        return new BigInteger(1, hash).toString(16);
     }
 }

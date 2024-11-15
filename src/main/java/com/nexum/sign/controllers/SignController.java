@@ -7,6 +7,7 @@ import com.nexum.sign.infraestructure.configuration.KeystoreConfig;
 import com.nexum.sign.models.RequestSign;
 import com.nexum.sign.models.Response;
 import com.nexum.sign.utils.FileUtil;
+import com.nexum.sign.utils.PdfUtil;
 import com.nexum.sign.utils.SignUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -77,6 +78,8 @@ public class SignController {
 
             req.encode = FileUtil.configureDocument(req.encode);
 
+            req.encode = PdfUtil.SetAcrossFields(req.encode, req.signers);
+
             String pdfSigned = SignUtil.Sign(req.encode, chain, privateKey, DigestAlgorithms.SHA256,
                     PdfSigner.CryptoStandard.CMS, req.signers);
 
@@ -86,7 +89,7 @@ public class SignController {
             res.msg = "procesado correctamente";
             res.data = pdfSigned;
 
-            return new ResponseEntity<>(res, new HttpHeaders(), HttpStatus.ACCEPTED);
+            return new ResponseEntity<>(res, new HttpHeaders(), HttpStatus.OK);
         } catch (Exception e) {
             res.msg = e.getMessage();
             res.code = e.hashCode();

@@ -1,5 +1,6 @@
 package com.nexum.sign.utils;
 
+import com.itextpdf.forms.form.element.SignatureFieldAppearance;
 import com.itextpdf.io.image.ImageData;
 import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.geom.Rectangle;
@@ -27,6 +28,7 @@ public class SignUtil {
             throws GeneralSecurityException, IOException {
 
         byte[] pdfBytes = Base64.getDecoder().decode(pdf);
+        String hash = FileUtil.getFileHash(pdf);
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         PdfReader reader = new PdfReader(new ByteArrayInputStream(pdfBytes));
 
@@ -36,7 +38,8 @@ public class SignUtil {
         IExternalSignature pks = new PrivateKeySignature(pk, digestAlgorithm, BouncyCastleProvider.PROVIDER_NAME);
 
         for (Signer signer : signers) {
-            PdfSigner pdfSigner = GetPdfSigner(signer, reader, output);
+            PdfSigner pdfSigner = GetPdfSigner(signer, reader, output, hash);
+            pdfSigner.setCertificationLevel(PdfSigner.CERTIFIED_NO_CHANGES_ALLOWED);
             pdfSigner.signDetached(digest, pks, chain, null, null, null, 0, subFilter);
         }
 
@@ -46,34 +49,39 @@ public class SignUtil {
         return result;
     }
 
-    private static PdfSigner GetPdfSigner(Signer signerInfo, PdfReader reader, ByteArrayOutputStream output) throws IOException {
+    private static PdfSigner GetPdfSigner(Signer signerInfo, PdfReader reader, ByteArrayOutputStream output, String hash) throws IOException {
         PdfSigner signer = new PdfSigner(reader, output, new StampingProperties());
         String contact = signerInfo.dbj_cedula + " - " + signerInfo.dbj_nombres + " " + signerInfo.dbj_apellidos;
         String fullName = signerInfo.dbj_nombres + " " + signerInfo.dbj_apellidos;
-        PdfSignatureAppearance appearance = signer.getSignatureAppearance();
-        appearance.setReason(signerInfo.reason);
-        appearance.setLocation(signerInfo.location);
-        appearance.setSignatureCreator("NexumSign");
-        appearance.setContact(contact);
-        appearance.setPageNumber(signerInfo.position.num_page);
-        appearance.setPageRect(new Rectangle(signerInfo.position.x, signerInfo.position.y, 300, 80));
         Date date = new Date();
 
-        ImageData back = ImageDataFactory.create("./fondo.png");
-        appearance.setImage(back);
-        appearance.setImageScale(0.3F);
+        signer.setReason(signerInfo.reason);
+        signer.setLocation(signerInfo.location);
+        signer.setSignatureCreator("NexumSign");
+        signer.setContact(contact);
+        signer.setPageRect(new Rectangle(signerInfo.position.x, signerInfo.position.y, 300, 70));
 
-        /*appearance.setLayer2Font(PdfFontFactory.createFont(StandardFonts.TIMES_ROMAN));*/
-        String text = "Firmante: \n" + fullName + "\nNo. Documento: " + signerInfo.dbj_cedula
+        String text = "Hash: \n" + hash + "\nFirmante: \n" + fullName + "\nNo. Documento: " + signerInfo.dbj_cedula
                 + "\nTIMESTAMP: " + date.getTime() + "\nRol: " + signerInfo.attribute_header
                 + "\nFace ID: " + signerInfo.face_id + "\nZone: " + signerInfo.location;
-        appearance.setLayer2Text(text);
-        appearance.setRenderingMode(PdfSignatureAppearance.RenderingMode.GRAPHIC_AND_DESCRIPTION);
 
+        SignatureFieldAppearance appearance = new SignatureFieldAppearance(signerInfo.dbj_cedula);
+        appearance.setPageNumber(signerInfo.position.num_page);
         byte[] img = Base64.getDecoder().decode(signerInfo.image_sign.encode);
         ImageData image = ImageDataFactory.create(img);
-        appearance.setSignatureGraphic(image);
+        appearance.setContent(text, image);
 
+        /*ImageData back = ImageDataFactory.create("./fondo.png");
+        BackgroundSize size = new BackgroundSize();
+        size.setBackgroundSizeToValues(UnitValue.createPercentValue(50), UnitValue.createPercentValue(30));
+
+        appearance.setBackgroundImage(
+                new BackgroundImage.Builder()
+                        .setImage(new PdfImageXObject(back))
+                        .setBackgroundSize(size)
+                        .build());*/
+
+        signer.setSignatureAppearance(appearance);
         signer.setCertificationLevel(1);
         signer.setFieldName(signerInfo.dbj_cedula);
         return signer;

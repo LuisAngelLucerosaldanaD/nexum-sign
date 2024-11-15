@@ -2,6 +2,8 @@ package com.nexum.sign.models.signer;
 
 import lombok.AllArgsConstructor;
 
+import java.util.List;
+
 @AllArgsConstructor
 public class Signer {
     public String attribute_header;
@@ -13,4 +15,5 @@ public class Signer {
     public Position position;
     public String reason;
     public String location;
+    public List<AcrossField> across_fields;
 }

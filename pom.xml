@@ -30,20 +30,19 @@
 		<dependency>
 			<groupId>com.itextpdf</groupId>
 			<artifactId>kernel</artifactId>
-			<version>8.0.1</version>
+			<version>8.0.5</version>
 		</dependency>
 
 		<dependency>
 			<groupId>com.itextpdf</groupId>
 			<artifactId>sign</artifactId>
-			<version>8.0.1</version>
+			<version>8.0.5</version>
 		</dependency>
 
-		<!-- https://mvnrepository.com/artifact/com.itextpdf/bouncy-castle-adapter -->
 		<dependency>
 			<groupId>com.itextpdf</groupId>
 			<artifactId>bouncy-castle-adapter</artifactId>
-			<version>8.0.1</version>
+			<version>8.0.5</version>
 		</dependency>
 
 
