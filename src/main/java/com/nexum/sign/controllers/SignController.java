@@ -4,9 +4,11 @@ import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfReader;
 import com.itextpdf.signatures.*;
 import com.nexum.sign.infraestructure.configuration.KeystoreConfig;
+import com.nexum.sign.models.PdfImage;
 import com.nexum.sign.models.RequestSign;
 import com.nexum.sign.models.Response;
 import com.nexum.sign.utils.FileUtil;
+import com.nexum.sign.utils.PdfUtil;
 import com.nexum.sign.utils.SignUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -48,10 +50,10 @@ public class SignController {
             required = true,
             content = @Content(mediaType = "application/json")
     )
-    public ResponseEntity<Response> SignPdf(
+    public ResponseEntity<Response<String>> SignPdf(
             @RequestBody RequestSign req
     ) {
-        Response res = new Response(true);
+        Response<String> res = new Response<>(true);
         if (req.isValid()) {
             res.msg = "Cuerpo de la petición no valida";
             res.code = 1;
@@ -97,14 +99,53 @@ public class SignController {
         }
     }
 
+    @Operation(summary = "Convierte las páginas del PDF en imágenes",
+            description = "Método que permite convertir las páginas del archivo PDF en imágenes")
+    @SecurityRequirement(name = "bearer")
+    @Tag(name = "Sign")
+    @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE, path = "/pdf-to-img")
+    @Parameter(in = ParameterIn.HEADER, name = "Authorization", description = "Token de autorización",
+            required = true, example = "Bearer <token>")
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            description = "Request body que contiene el archivo PDF a convertir en imágenes",
+            required = true,
+            content = @Content(mediaType = "application/json")
+    )
+    public ResponseEntity<Response<List<PdfImage>>> GetPagesToImg(
+            @RequestParam("pdf") MultipartFile pdf
+    ) {
+        Response<List<PdfImage>> res = new Response<>(true);
+        if (pdf.isEmpty()) {
+            res.msg = "No se ha enviado el archivo pdf";
+            res.code = 1;
+            res.type = "error";
+            return new ResponseEntity<>(res, new HttpHeaders(), HttpStatus.BAD_REQUEST);
+        }
+
+        try {
+            List<PdfImage> images = PdfUtil.getPagesToImg(pdf.getBytes());
+            res.error = false;
+            res.code = 29;
+            res.type = "success";
+            res.msg = "procesado correctamente";
+            res.data = images;
+            return new ResponseEntity<>(res, new HttpHeaders(), HttpStatus.OK);
+        } catch (Exception e) {
+            res.msg = e.getMessage();
+            res.code = e.hashCode();
+            res.type = "error";
+            return new ResponseEntity<>(res, new HttpHeaders(), HttpStatus.ACCEPTED);
+        }
+    }
+
     @Operation(summary = "Valida la firma electrónica del PDF generado por Nexum",
             description = "Método que permite validar la firmar eletrónicamente del archivo PDF generado por el sistema Nexum")
     @Tag(name = "Sign")
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE, path = "/validate-sign", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<Response> ValidateSignPdf(
+    public ResponseEntity<Response<Boolean>> ValidateSignPdf(
             @RequestParam("pdf") MultipartFile pdf
     ) {
-        Response res = new Response(true);
+        Response<Boolean> res = new Response<>(true);
 
         try {
 

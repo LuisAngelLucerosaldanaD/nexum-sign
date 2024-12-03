@@ -1,10 +1,10 @@
 package com.nexum.sign.models;
 
-public class Response {
+public class Response<T> {
     public boolean error;
     public int code;
 
-    public String data;
+    public T data;
     public String msg;
     public String type;
 
@@ -12,7 +12,6 @@ public class Response {
         this.error = error;
         this.code = 0;
         this.msg = "";
-        this.data = "";
         this.type = "";
     }
 
