@@ -64,9 +64,10 @@ public class SignUtil {
         signer.setSignatureCreator("NexumSign");
         signer.setContact(contact);
         signer.setPageRect(new Rectangle(signerInfo.position.x, signerInfo.position.y, 300, 70));
+        long timestamp = date.getTime();
 
         String text = String.format("Hash: %s\nFirmante: %s\nNo. Documento: %s\nTIMESTAMP: %d\nRol: %s\nFace ID: %s\nZone: %s", hash, fullName,
-                signerInfo.dbj_cedula, date.getTime(), signerInfo.attribute_header, signerInfo.face_id, signerInfo.location);
+                signerInfo.dbj_cedula, timestamp, signerInfo.attribute_header, signerInfo.face_id, signerInfo.location);
 
         SignatureFieldAppearance appearance = new SignatureFieldAppearance(signerInfo.dbj_cedula);
         appearance.setPageNumber(signerInfo.position.num_page);
@@ -75,7 +76,7 @@ public class SignUtil {
         appearance.setContent(text, image);
 
         signer.setSignatureAppearance(appearance);
-        signer.setFieldName(signerInfo.dbj_cedula);
+        signer.setFieldName(signerInfo.dbj_cedula + "-" + timestamp);
         return signer;
     }
 }
