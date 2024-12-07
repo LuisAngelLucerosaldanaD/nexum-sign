@@ -16,4 +16,5 @@ public class Signer {
     public String reason;
     public String location;
     public List<AcrossField> across_fields;
+    public Cert cert;
 }

@@ -39,7 +39,6 @@ public class FileUtil {
         throw new ErrorUtil("No se pudo eliminar el archivo");
     }
 
-
     public static String getBase64ToPath(String path) throws IOException {
         try (FileInputStream fis = new FileInputStream(path)) {
             byte[] fileBytes = new byte[fis.available()];

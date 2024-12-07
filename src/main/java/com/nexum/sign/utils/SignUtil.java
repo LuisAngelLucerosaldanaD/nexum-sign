@@ -7,13 +7,17 @@ import com.itextpdf.kernel.geom.Rectangle;
 import com.itextpdf.kernel.pdf.PdfReader;
 import com.itextpdf.kernel.pdf.StampingProperties;
 import com.itextpdf.signatures.*;
+import com.nexum.sign.models.signer.Cert;
 import com.nexum.sign.models.signer.Signer;
+import com.nexum.sign.models.signer.SignerCertificate;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.Security;
 import java.security.cert.Certificate;
@@ -35,13 +39,23 @@ public class SignUtil {
         for (Signer signer : signers) {
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             IExternalDigest digest = new BouncyCastleDigest();
-            IExternalSignature pks = new PrivateKeySignature(pk, digestAlgorithm, BouncyCastleProvider.PROVIDER_NAME);
+
+            IExternalSignature pks;
+            Certificate[] chainCert;
+            if (signer.cert != null && signer.cert.certificate != null && !signer.cert.certificate.isEmpty()) {
+               var sigCert = getSignerCertificate(signer.cert);
+                pks = new PrivateKeySignature(sigCert.privateKey, digestAlgorithm, BouncyCastleProvider.PROVIDER_NAME);
+                chainCert = sigCert.certificates;
+            } else {
+                pks = new PrivateKeySignature(pk, digestAlgorithm, BouncyCastleProvider.PROVIDER_NAME);
+                chainCert = chain;
+            }
 
             String hash = FileUtil.getHash(currentPdfBytes);
             PdfReader reader = new PdfReader(new ByteArrayInputStream(currentPdfBytes));
             PdfSigner pdfSigner = GetPdfSigner(signer, reader, output, hash);
             pdfSigner.setCertificationLevel(PdfSigner.NOT_CERTIFIED);
-            pdfSigner.signDetached(digest, pks, chain, null, null, null, 0, subFilter);
+            pdfSigner.signDetached(digest, pks, chainCert, null, null, null, 0, subFilter);
             currentPdfBytes = output.toByteArray();
 
             output.close();
@@ -78,5 +92,18 @@ public class SignUtil {
         signer.setSignatureAppearance(appearance);
         signer.setFieldName(signerInfo.dbj_cedula + "-" + timestamp);
         return signer;
+    }
+
+    private static SignerCertificate getSignerCertificate(Cert cert) throws GeneralSecurityException, IOException {
+        byte[] decodedBytes = Base64.getDecoder().decode(cert.certificate);
+        ByteArrayInputStream inputStream = new ByteArrayInputStream(decodedBytes);
+
+        KeyStore keystore = KeyStore.getInstance("PKCS12");
+        keystore.load(inputStream, cert.password.toCharArray());
+
+        Certificate[] chain = keystore.getCertificateChain(cert.alias);
+        PrivateKey privateKey = (PrivateKey) keystore.getKey(cert.alias, cert.password.toCharArray());
+
+        return new SignerCertificate(chain, privateKey);
     }
 }
