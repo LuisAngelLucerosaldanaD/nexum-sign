@@ -20,6 +20,8 @@ import java.util.Base64;
 import java.util.List;
 
 public class FileUtil {
+
+    public static String PNG_MIME = "data:image/png;base64,";
     public static void base64ToStore(String file, String path) throws IOException {
         byte[] decodedBytes = Base64.getDecoder().decode(file);
         File fileByt = new File(path);

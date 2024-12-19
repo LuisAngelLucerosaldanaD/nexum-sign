@@ -28,7 +28,7 @@ public class PdfUtil {
             ImageIO.write(image, "PNG", out);
             String imageBase64 = Base64.getEncoder().encodeToString(out.toByteArray());
             String name = scaleX + "x" + scaleY + (page + 1) + "-.png";
-            images.add(new PdfImage(imageBase64, page + 1, name, image.getWidth(), image.getHeight()));
+            images.add(new PdfImage(FileUtil.PNG_MIME + imageBase64, page + 1, name, image.getWidth(), image.getHeight()));
         }
 
         return images;
